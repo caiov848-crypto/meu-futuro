@@ -8,7 +8,7 @@ import { useUI } from '../../state/ui';
 import { AmountInput, Chip, ConfirmSheet, Field, Sheet, Toggle } from '../../ui/primitives';
 import { AccountsSheet } from '../plan/sheets';
 import { ExportPdfSheet } from '../export/ExportPdfSheet';
-import { syncNow, useSyncStatus, type SyncState } from '../../data/sync';
+import { CloudSyncCard } from './CloudSyncCard';
 import { saveFile } from '../../lib/saveFile';
 
 export function SettingsSheet({ close }: { close: () => void }) {
@@ -36,7 +36,7 @@ export function SettingsSheet({ close }: { close: () => void }) {
 
   return (
     <Sheet title="Ajustes" onClose={close}>
-      <SyncCard />
+      <CloudSyncCard />
       <div className="card stack">
         <Field label="Limite de segurança" hint="Saldo mínimo que você não quer ultrapassar. Usado na previsão e nos simuladores.">
           <AmountInput size="md" value={safety} onChange={setSafety} label="Limite de segurança" />
@@ -98,40 +98,6 @@ export function SettingsSheet({ close }: { close: () => void }) {
 
       <p className="field-hint" style={{ textAlign: 'center' }}>Meu Futuro funciona offline. Seus dados ficam guardados neste aparelho.</p>
     </Sheet>
-  );
-}
-
-const SYNC_TEXT: Record<SyncState, { title: string; detail: string; pill: string; label: string }> = {
-  local: { title: 'Somente neste aparelho', detail: 'Abra o Meu Futuro pelo link do claude.ai para usar os mesmos dados no PC e no celular.', pill: 'pill', label: 'Local' },
-  connecting: { title: 'Conectando…', detail: 'Buscando seus dados na nuvem.', pill: 'pill-info', label: 'Conectando' },
-  synced: { title: 'Sincronizado', detail: 'PC e celular usam os mesmos dados. Mudanças aparecem nos dois em segundos.', pill: 'pill-ok', label: 'Em dia' },
-  saving: { title: 'Salvando na nuvem…', detail: 'Enviando as últimas alterações.', pill: 'pill-info', label: 'Salvando' },
-  error: { title: 'Não foi possível sincronizar', detail: 'Suas alterações continuam salvas neste aparelho e serão enviadas assim que der.', pill: 'pill-risk', label: 'Erro' },
-};
-
-function SyncCard() {
-  const { state, detail, lastSyncedAt } = useSyncStatus();
-  const t = SYNC_TEXT[state];
-  const last = lastSyncedAt
-    ? new Date(lastSyncedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-    : null;
-  return (
-    <div className="card stack" style={{ gap: 6 }}>
-      <div className="row between">
-        <strong>{t.title}</strong>
-        <span className={`pill ${t.pill}`}>{t.label}</span>
-      </div>
-      <p className="field-hint" style={{ padding: 0 }}>{t.detail}</p>
-      {state === 'error' && detail && <p className="field-hint" style={{ padding: 0 }}>{detail}</p>}
-      {state !== 'local' && (
-        <div className="row between">
-          <span className="field-hint" style={{ padding: 0 }}>{last ? `Última sincronização às ${last}` : 'Ainda não sincronizou nesta sessão'}</span>
-          <button className="btn btn-secondary btn-sm" onClick={syncNow} disabled={state === 'connecting' || state === 'saving'}>
-            Sincronizar agora
-          </button>
-        </div>
-      )}
-    </div>
   );
 }
 

@@ -72,6 +72,16 @@ export interface ShardWrite {
   records: Record<string, Rec>;
 }
 
+/** Aplica as gravações planejadas sobre os blocos atuais (bloco vazio some). */
+export function applyShardWrites(current: Map<string, Shard>, writes: ShardWrite[]): Map<string, Shard> {
+  const next = new Map(current);
+  for (const w of writes) {
+    if (Object.keys(w.records).length === 0) next.delete(w.shard);
+    else next.set(w.shard, { table: w.table, records: w.records });
+  }
+  return next;
+}
+
 const signature = (records: Record<string, Rec>) =>
   Object.values(records)
     .map((r) => `${r.id}@${r.updatedAt}`)

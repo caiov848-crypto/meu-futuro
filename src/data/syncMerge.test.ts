@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { planPull, planPush, shardOf, TABLES, type Local, type Rec, type Shard } from './syncMerge';
+import { applyShardWrites, planPull, planPush, shardOf, TABLES, type Local, type Rec, type Shard } from './syncMerge';
 
 const empty = (): Local => Object.fromEntries(TABLES.map((t) => [t, []])) as unknown as Local;
 const r = (id: string, updatedAt: string, date?: string): Rec => ({ id, updatedAt, ...(date ? { date } : {}) });
@@ -60,6 +60,15 @@ describe('sincronização: enviar para a nuvem', () => {
     const writes = planPush(local, remote, '');
     expect(writes.find((w) => w.shard === 'tx-2026-09-a')?.records).toEqual({});
     expect(Object.keys(writes.find((w) => w.shard === 'tx-2026-09-b')!.records)).toEqual(['t1']);
+  });
+
+  it('aplicar gravações remove blocos vazios e atualiza os demais', () => {
+    const local = empty();
+    local.transactions = [r('t1', '2026-09-15T11:00', '2026-09-20')];
+    const remote = shards(['tx-2026-09-a', { table: 'transactions', records: { t1: r('t1', '2026-09-15T10:00', '2026-09-03') } }]);
+    const next = applyShardWrites(remote, planPush(local, remote, ''));
+    expect([...next.keys()]).toEqual(['tx-2026-09-b']);
+    expect(planPush(local, next, '')).toEqual([]);
   });
 
   it('substituição remove da nuvem os registros antigos', () => {
