@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { connectGithub } from '../../data/gistSync';
+import { buildSyncLink, connectGithub } from '../../data/gistSync';
 import { useSyncStatus } from '../../data/sync';
 import { Field } from '../../ui/primitives';
 
@@ -8,24 +8,76 @@ const TOKEN_URL = 'https://github.com/settings/tokens/new?scopes=gist&descriptio
 /**
  * Sincronização entre aparelhos: uma vez conectado, some da tela e fica
  * rodando sozinho para sempre — sem status, sem botões, sem escolhas.
- * Só aparece algo aqui se ainda não foi configurado, ou se algo falhar.
+ * Conectar um segundo aparelho é um link de um clique (nada para digitar);
+ * só o primeiro aparelho precisa do token+senha, que gera esse link.
  */
 export function CloudSyncCard() {
   const { backend, state, detail } = useSyncStatus();
+  const [showLink, setShowLink] = useState(false);
 
   if (backend === 'claude') return null; // sincroniza pelo claude.ai; nada a configurar aqui.
-  if (backend === 'github' && state !== 'error') return null; // conectado e funcionando: invisível.
+
+  if (backend === 'github' && state !== 'error') {
+    if (!showLink) {
+      return (
+        <button className="link" style={{ padding: '6px 2px' }} onClick={() => setShowLink(true)}>
+          Sincronizar outro aparelho
+        </button>
+      );
+    }
+    return <LinkPanel onClose={() => setShowLink(false)} />;
+  }
 
   return (
     <div className="card stack" style={{ gap: 10 }}>
       <strong>Sincronizar com outros aparelhos</strong>
       {state === 'error' && detail && <p className="form-error" style={{ textAlign: 'left' }}>{detail}</p>}
-      <GithubConnect />
+      <ConnectForm onConnected={() => setShowLink(true)} />
     </div>
   );
 }
 
-function GithubConnect() {
+function LinkPanel({ onClose }: { onClose: () => void }) {
+  const [copied, setCopied] = useState(false);
+  const link = buildSyncLink();
+  if (!link) return null;
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(true);
+    } catch {
+      /* clipboard indisponível: a pessoa seleciona e copia manualmente */
+    }
+  };
+
+  return (
+    <div className="card stack" style={{ gap: 10 }}>
+      <strong>Link para sincronizar outro aparelho</strong>
+      <p className="field-hint" style={{ padding: 0 }}>
+        Abra este link no outro aparelho — não precisa digitar nada. Ele conecta sozinho e depois some da tela,
+        como aqui.
+      </p>
+      <input
+        id="sync-link"
+        className="input"
+        readOnly
+        value={link}
+        onFocus={(e) => e.currentTarget.select()}
+      />
+      <div className="row" style={{ gap: 8 }}>
+        <button className="btn btn-primary" onClick={copy}>{copied ? 'Copiado!' : 'Copiar link'}</button>
+        <button className="btn btn-ghost" onClick={onClose}>Fechar</button>
+      </div>
+      <p className="field-hint" style={{ padding: 0 }}>
+        Trate este link como uma senha: quem o abrir passa a ver e editar os seus dados. Envie só para você
+        mesmo, por um canal de confiança.
+      </p>
+    </div>
+  );
+}
+
+function ConnectForm({ onConnected }: { onConnected: () => void }) {
   const [token, setToken] = useState('');
   const [passphrase, setPassphrase] = useState('');
   const [busy, setBusy] = useState(false);
@@ -36,6 +88,7 @@ function GithubConnect() {
     setError('');
     try {
       await connectGithub(token, passphrase);
+      onConnected();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -46,8 +99,8 @@ function GithubConnect() {
   return (
     <div className="stack" style={{ gap: 10 }}>
       <p className="field-hint" style={{ padding: 0 }}>
-        Conecte uma vez em cada aparelho, com o mesmo token e a mesma senha. Depois disso fica sincronizando
-        sozinho, sem precisar tocar em mais nada. Tudo é criptografado com a sua senha antes de sair do aparelho.
+        Conecte uma vez, neste aparelho. Depois disso você recebe um link para abrir nos outros — sem digitar
+        nada neles — e a sincronização fica rodando sozinha, para sempre.
       </p>
       <ol className="field-hint" style={{ margin: 0, paddingLeft: 18, lineHeight: 1.6 }}>
         <li>

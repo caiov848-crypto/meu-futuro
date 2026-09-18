@@ -5,7 +5,7 @@
  *   do GitHub, se o usuário conectou em Ajustes.
  * Sem nenhum dos dois, o app funciona só com os dados locais.
  */
-import { initGistSync, syncGistNow } from './gistSync';
+import { connectFromLinkIfPresent, initGistSync, syncGistNow } from './gistSync';
 import {
   applyRemote, createSerial, getSyncStatus, localResetAt, readLocal, setLocalResetAt, setSyncStatus, watchLocal,
 } from './syncCore';
@@ -49,7 +49,9 @@ export async function initCloudSync(timeoutMs = 8000): Promise<void> {
   started = true;
   const claude = (window as unknown as { claude?: { use?: (name: string) => Promise<unknown> } }).claude;
   if (typeof claude?.use !== 'function') {
-    await initGistSync(timeoutMs);
+    // Um link pessoal de sincronização na URL tem prioridade: conecta sozinho, sem digitar nada.
+    const task = connectFromLinkIfPresent().then((linked) => (linked ? undefined : initGistSync(timeoutMs)));
+    await Promise.race([task, new Promise((r) => setTimeout(r, timeoutMs))]);
     return;
   }
   setSyncStatus({ state: 'connecting', backend: 'claude' });

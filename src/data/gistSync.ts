@@ -257,6 +257,61 @@ export function syncGistNow() {
  *   dado só deste aparelho é substituído. A partir daí a sincronização é
  *   automática e contínua (o mais recente vence, por registro).
  */
+const LINK_PARAM = "sync";
+
+/** Codifica token+senha num payload compacto e seguro para URL (base64url). */
+function encodeLinkPayload(token: string, passphrase: string): string {
+  const json = JSON.stringify({ t: token, p: passphrase });
+  const b64 = btoa(unescape(encodeURIComponent(json)));
+  return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function decodeLinkPayload(b64url: string): { token: string; passphrase: string } {
+  const b64 = b64url.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = b64 + "=".repeat((4 - (b64.length % 4)) % 4);
+  const json = decodeURIComponent(escape(atob(padded)));
+  const { t, p } = JSON.parse(json) as { t?: string; p?: string };
+  if (!t || !p) throw new Error("Link de sincronização incompleto.");
+  return { token: t, passphrase: p };
+}
+
+/**
+ * Link pessoal para conectar OUTRO aparelho sem digitar nada: token e senha
+ * viajam no fragmento da URL (depois do #), que o navegador nunca envia a
+ * nenhum servidor e não aparece em nenhum log. Mesmo assim, equivale a uma
+ * senha — só deve ser aberto pelo próprio dono, num canal de confiança.
+ */
+export function buildSyncLink(origin = `${window.location.origin}${window.location.pathname}`): string | null {
+  const cfg = loadConfig();
+  if (!cfg) return null;
+  return `${origin}#${LINK_PARAM}=${encodeLinkPayload(cfg.token, cfg.passphrase)}`;
+}
+
+function readLinkFromLocation(): { token: string; passphrase: string } | null {
+  const hash = window.location.hash;
+  const prefix = `#${LINK_PARAM}=`;
+  if (!hash.startsWith(prefix)) return null;
+  try {
+    return decodeLinkPayload(hash.slice(prefix.length));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Se a URL trouxer um link pessoal de sincronização, conecta com ele e
+ * apaga o fragmento da URL imediatamente (antes de qualquer coisa
+ * assíncrona), para a credencial não ficar visível na barra de endereço
+ * nem no histórico do navegador.
+ */
+export async function connectFromLinkIfPresent(): Promise<boolean> {
+  const creds = readLinkFromLocation();
+  if (!creds) return false;
+  history.replaceState(null, "", window.location.pathname + window.location.search);
+  await connectGithub(creds.token, creds.passphrase);
+  return true;
+}
+
 export async function connectGithub(tokenInput: string, passphraseInput: string): Promise<void> {
   const token = tokenInput.trim();
   const passphrase = passphraseInput;
