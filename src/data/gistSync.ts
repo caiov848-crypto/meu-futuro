@@ -9,8 +9,8 @@
  */
 import { decryptText, encryptText, envelopeSalt, WrongPassphraseError } from '../lib/crypto';
 import {
-  applyRemote, createSerial, hasMeaningfulLocalData, localResetAt, readLocal, replaceLocalWithRemote,
-  restampAllLocal, setLocalResetAt, setSyncStatus, watchLocal,
+  applyRemote, createSerial, localResetAt, readLocal, replaceLocalWithRemote,
+  setLocalResetAt, setSyncStatus, watchLocal,
 } from './syncCore';
 import { applyShardWrites, planPush, type Shard } from './syncMerge';
 
@@ -249,59 +249,42 @@ export function syncGistNow() {
   if (running) void serial(cycle);
 }
 
-let pending: GistConfig | null = null;
-
-export type ConnectResult = { kind: 'created' } | { kind: 'found'; hasLocalData: boolean };
-
 /**
- * Primeiro passo da conexão: valida o token, procura o Gist e testa a senha.
- * Se não existir, cria com os dados deste aparelho e já começa a sincronizar.
+ * Conecta ao GitHub e liga a sincronização, sem pedir nenhuma escolha:
+ * - Se ainda não existe nuvem para este token, este aparelho VIRA a nuvem
+ *   (seus dados de agora são o ponto de partida).
+ * - Se já existe nuvem, este aparelho SEMPRE adota os dados dela — qualquer
+ *   dado só deste aparelho é substituído. A partir daí a sincronização é
+ *   automática e contínua (o mais recente vence, por registro).
  */
-export async function connectGithub(tokenInput: string, passphraseInput: string): Promise<ConnectResult> {
+export async function connectGithub(tokenInput: string, passphraseInput: string): Promise<void> {
   const token = tokenInput.trim();
   const passphrase = passphraseInput;
-  if (!token) throw new Error('Cole o token do GitHub.');
-  if (passphrase.length < 8) throw new Error('A senha de sincronização precisa ter pelo menos 8 caracteres.');
+  if (!token) throw new Error("Cole o token do GitHub.");
+  if (passphrase.length < 8) throw new Error("A senha de sincronização precisa ter pelo menos 8 caracteres.");
 
   const gistId = await findGist(token);
+  salt = undefined;
+  etag = null;
+
   if (!gistId) {
-    salt = undefined;
     const reset = localResetAt();
     const shards = applyShardWrites(new Map(), planPush(await readLocal(), new Map(), reset));
-    const text = await encodeBlob({ app: 'meu-futuro', v: 1, resetAt: reset, shards: Object.fromEntries(shards) }, passphrase);
+    const text = await encodeBlob({ app: "meu-futuro", v: 1, resetAt: reset, shards: Object.fromEntries(shards) }, passphrase);
     const id = await writeGist(token, null, text);
     const cfg = { token, passphrase, gistId: id };
-    saveConfig(cfg);
     remoteShards = shards;
     remoteResetAt = reset;
-    etag = null;
+    saveConfig(cfg);
     await start(cfg);
-    return { kind: 'created' };
+    return;
   }
 
-  // Existe: confirma a senha antes de qualquer mudança.
-  etag = null;
   const cfg = { token, passphrase, gistId };
-  await fetchRemote(cfg);
-  pending = cfg;
-  return { kind: 'found', hasLocalData: await hasMeaningfulLocalData() };
-}
-
-export type FinishMode = 'useCloud' | 'useThisDevice' | 'merge';
-
-/** Segundo passo quando já existe sincronização: decide o que fazer com os dados deste aparelho. */
-export async function finishGithubConnect(mode: FinishMode): Promise<void> {
-  const cfg = pending;
-  if (!cfg) throw new Error('Conecte novamente.');
-  if (mode === 'useCloud') await replaceLocalWithRemote(remoteShards, remoteResetAt);
-  if (mode === 'useThisDevice') await restampAllLocal(new Date().toISOString());
+  await fetchRemote(cfg); // valida a senha (lança WrongPassphraseError se errada)
+  await replaceLocalWithRemote(remoteShards, remoteResetAt);
   saveConfig(cfg);
-  pending = null;
   await start(cfg);
-}
-
-export function cancelGithubConnect() {
-  pending = null;
 }
 
 /** Desliga a sincronização neste aparelho. Os dados locais e a cópia na nuvem continuam. */
@@ -310,8 +293,8 @@ export function disconnectGithub() {
   clearConfig();
   config = null;
   remoteShards = new Map();
-  remoteResetAt = '';
+  remoteResetAt = "";
   etag = null;
   salt = undefined;
-  setSyncStatus({ state: 'local', backend: 'none', detail: '', lastSyncedAt: null });
+  setSyncStatus({ state: "local", backend: "none", detail: "", lastSyncedAt: null });
 }
