@@ -1,13 +1,11 @@
 /**
  * Ponto de entrada da sincronização.
  * - Aberto pelo claude.ai: usa a capability `db` do Artifact.
- * - Em qualquer outro endereço (ex.: GitHub Pages): usa o Gist criptografado
- *   do GitHub, se o usuário conectou em Ajustes.
- * Sem nenhum dos dois, o app funciona só com os dados locais.
+ * - Em qualquer outro endereço: usa a Sincronização Mágica (KVDB)
  */
-import { connectFromLinkIfPresent, initGistSync, syncGistNow } from './gistSync';
+import { connectFromLinkIfPresent, initAutoSync, syncAutoNow } from './autoSync';
 import {
-  applyRemote, createSerial, getSyncStatus, localResetAt, readLocal, setLocalResetAt, setSyncStatus, watchLocal,
+  applyRemote, createSerial, localResetAt, readLocal, setLocalResetAt, setSyncStatus, watchLocal,
 } from './syncCore';
 import { planPush, type Rec, type Shard, type TableName } from './syncMerge';
 
@@ -50,7 +48,7 @@ export async function initCloudSync(timeoutMs = 8000): Promise<void> {
   const claude = (window as unknown as { claude?: { use?: (name: string) => Promise<unknown> } }).claude;
   if (typeof claude?.use !== 'function') {
     // Um link pessoal de sincronização na URL tem prioridade: conecta sozinho, sem digitar nada.
-    const task = connectFromLinkIfPresent().then((linked) => (linked ? undefined : initGistSync(timeoutMs)));
+    const task = connectFromLinkIfPresent().then((linked) => (linked ? undefined : initAutoSync(timeoutMs)));
     await Promise.race([task, new Promise((r) => setTimeout(r, timeoutMs))]);
     return;
   }
@@ -69,7 +67,7 @@ export async function initCloudSync(timeoutMs = 8000): Promise<void> {
 
 /** Força uma rodada de sincronização agora. */
 export function syncNow() {
-  if (getSyncStatus().backend === 'github') return syncGistNow();
+  if (!remote) return syncAutoNow();
   if (remote && initialLoaded) scheduleSync(0);
 }
 
