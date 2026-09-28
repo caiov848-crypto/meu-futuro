@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useFinance } from '../../state/finance';
-import { formatCents } from '../../lib/currency';
-import { formatDateShort } from '../../lib/date';
+import { formatMoney } from '../../lib/money';
+import { fmtDayMonth } from '../../lib/date';
 import { Icon } from '../../ui/Icon';
 import { useUI } from '../../state/ui';
 import { EntrySheet } from '../entry/EntrySheet';
@@ -49,7 +49,7 @@ export function TableScreen() {
               const cat = category(tx.categoryId);
               return (
                 <tr key={tx.id} className={tx.status === 'planned' ? 'planned-row' : ''}>
-                  <td className="date-cell">{formatDateShort(tx.date)}</td>
+                  <td className="date-cell">{fmtDayMonth(tx.date)}</td>
                   <td className="desc-cell">
                     <span className="desc-text">{tx.description}</span>
                     {tx.note && <span className="desc-note" title={tx.note}> 📝</span>}
@@ -59,7 +59,7 @@ export function TableScreen() {
                   </td>
                   <td className="acc-cell">{accountName(tx.accountId)}</td>
                   <td className={`amount-cell ${tx.direction}`}>
-                    {tx.direction === 'out' ? '-' : '+'}{formatCents(tx.amount)}
+                    {formatMoney(tx.amount * (tx.direction === 'out' ? -1 : 1), { sign: true })}
                   </td>
                   <td className="status-cell">
                     {tx.status === 'done' ? (
@@ -80,6 +80,7 @@ export function TableScreen() {
                 </tr>
               );
             })}
+
             {transactions.length === 0 && (
               <tr>
                 <td colSpan={7} className="empty-cell">Nenhum lançamento encontrado.</td>
