@@ -391,22 +391,29 @@ textarea.input { padding: 12px 14px; min-height: 76px; resize: vertical; }
   width: 100%;
   border-collapse: collapse;
   text-align: left;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-md);
 }
 
 .data-table th, .data-table td {
-  padding: 12px 16px;
+  padding: 16px;
   border-bottom: 1px solid var(--line);
   white-space: nowrap;
 }
 
 .data-table th {
-  font-weight: 600;
+  font-weight: 650;
   color: var(--ink-2);
   background: var(--surface-2);
   position: sticky;
   top: 0;
   z-index: 10;
+  font-size: var(--fs-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.data-table tbody tr {
+  transition: background 150ms ease;
 }
 
 .data-table tbody tr:hover {
@@ -414,13 +421,14 @@ textarea.input { padding: 12px 14px; min-height: 76px; resize: vertical; }
 }
 
 .data-table .planned-row {
-  opacity: 0.7;
+  color: var(--ink-2);
 }
 
 .amount-cell {
   text-align: right;
   font-variant-numeric: tabular-nums;
-  font-weight: 500;
+  font-weight: 650;
+  font-size: 1.05em;
 }
 
 .amount-cell.in {
