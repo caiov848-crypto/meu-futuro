@@ -3,8 +3,8 @@ import {
 } from 'react';
 import type { ISODate } from '../domain/types';
 
-export type Tab = 'today' | 'forecast' | 'plan' | 'more';
-const TABS: Tab[] = ['today', 'forecast', 'plan', 'more'];
+export type Tab = 'today' | 'forecast' | 'table' | 'plan' | 'more';
+const TABS: Tab[] = ['today', 'forecast', 'table', 'plan', 'more'];
 
 type SheetRender = (close: () => void) => ReactNode;
 interface SheetEntry {

@@ -6,6 +6,7 @@ import { Icon } from './ui/Icon';
 import { TodayScreen } from './features/today/TodayScreen';
 import { ForecastScreen } from './features/forecast/ForecastScreen';
 import { PlanScreen } from './features/plan/PlanScreen';
+import { TableScreen } from './features/table/TableScreen';
 import { MoreScreen } from './features/more/MoreScreen';
 import { EntrySheet } from './features/entry/EntrySheet';
 import { Welcome } from './features/onboarding/Welcome';
@@ -13,6 +14,7 @@ import { Welcome } from './features/onboarding/Welcome';
 const TABS: { tab: Tab; label: string; icon: IconName }[] = [
   { tab: 'today', label: 'Hoje', icon: 'today' },
   { tab: 'forecast', label: 'Previsão', icon: 'forecast' },
+  { tab: 'table', label: 'Tabela', icon: 'table' },
   { tab: 'plan', label: 'Planejar', icon: 'plan' },
   { tab: 'more', label: 'Mais', icon: 'more' },
 ];
@@ -20,6 +22,7 @@ const TABS: { tab: Tab; label: string; icon: IconName }[] = [
 const SCREENS: Record<Tab, ComponentType> = {
   today: TodayScreen,
   forecast: ForecastScreen,
+  table: TableScreen,
   plan: PlanScreen,
   more: MoreScreen,
 };
@@ -48,7 +51,7 @@ export default function App() {
           <button className="fab" aria-label="Novo lançamento" onClick={() => ui.openSheet((c) => <EntrySheet close={c} />)}>
             <Icon name="plus" size={26} stroke={2.4} />
           </button>
-          {TABS.slice(2).map(tabButton)}
+          {TABS.slice(2, 5).map(tabButton)}
         </div>
       </nav>
     </div>
