@@ -62,7 +62,7 @@ h1, h2, h3, p { margin: 0; }
 .screen { display: flex; flex-direction: column; gap: 14px; padding-top: max(18px, env(safe-area-inset-top)); animation: fade-in 180ms ease-out; }
 .screen-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 2px 2px; }
 .screen-head h1 { font-size: var(--fs-xl); font-weight: 700; letter-spacing: -0.02em; }
-.screen-head p { color: var(--ink-3); font-size: var(--fs-sm); text-transform: capitalize; }
+.screen-head p { color: var(--ink-3); font-size: var(--fs-sm); }
 .section { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
 .section-head { display: flex; align-items: baseline; justify-content: space-between; padding: 0 4px; }
 .section-head h2 { font-size: var(--fs-md); font-weight: 650; }
@@ -205,7 +205,9 @@ textarea.input { padding: 12px 14px; min-height: 76px; resize: vertical; }
 .chips { display: flex; gap: 8px; flex-wrap: wrap; }
 .chips-scroll { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 2px 16px; }
 .chips-scroll::-webkit-scrollbar { display: none; }
-.chip { position: relative; display: inline-flex; align-items: center; gap: 6px; min-height: 38px; padding: 0 14px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); font-size: var(--fs-sm); font-weight: 550; white-space: nowrap; color: var(--ink-2); flex: none; }
+.chip { position: relative; display: inline-flex; align-items: center; gap: 6px; min-height: 38px; padding: 0 14px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); font-size: var(--fs-sm); font-weight: 550; white-space: nowrap; color: var(--ink-2); flex: none; transition: background 120ms ease, border-color 120ms ease; }
+.chip:hover { border-color: var(--ink-3); }
+.chip-sm { min-height: 24px; padding: 2px 10px; font-size: var(--fs-xs); font-weight: 600; }
 .chip[aria-pressed='true'] { background: var(--ink); border-color: var(--ink); color: #fff; }
 .chip-suggest { background: var(--blue-soft); border-color: transparent; color: var(--blue); }
 .date-native { position: absolute; inset: 0; opacity: 0; width: 100%; cursor: pointer; }
@@ -272,20 +274,26 @@ textarea.input { padding: 12px 14px; min-height: 76px; resize: vertical; }
 /* ---------- Forecast ---------- */
 
 .big-number { font-size: 2.25rem; font-weight: 750; letter-spacing: -0.035em; line-height: 1.1; }
-.chart-wrap { position: relative; touch-action: pan-y; user-select: none; margin: 0 -6px; }
+.chart-wrap { position: relative; touch-action: pan-y; user-select: none; margin: 0 -4px; }
 .chart-wrap svg { display: block; width: 100%; overflow: visible; }
-.chart-legend { display: flex; gap: 14px; font-size: var(--fs-xs); color: var(--ink-3); margin-top: 4px; flex-wrap: wrap; }
-.chart-legend i { display: inline-block; width: 14px; height: 0; border-top: 2px solid var(--blue); vertical-align: middle; margin-right: 5px; }
+.chart-legend { display: flex; gap: 14px; font-size: var(--fs-xs); color: var(--ink-3); margin-top: 6px; flex-wrap: wrap; }
+.chart-legend span { display: inline-flex; align-items: center; }
+.chart-legend i { display: inline-block; width: 14px; height: 0; border-top: 2px solid var(--blue); vertical-align: middle; margin-right: 6px; }
 .chart-legend i.dash { border-top: 2px dashed var(--coral); }
 .chart-legend i.dot { width: 8px; height: 8px; border: 0; border-radius: 50%; background: var(--amber); }
-.day-detail { background: var(--surface-2); border-radius: 14px; padding: 10px 12px; font-size: var(--fs-sm); display: flex; flex-direction: column; gap: 4px; }
-.day-detail-row { display: flex; justify-content: space-between; gap: 8px; }
+.calendar-legend { display: flex; gap: 14px; font-size: var(--fs-xs); color: var(--ink-3); margin-top: 10px; flex-wrap: wrap; }
+.calendar-legend .legend-item { display: inline-flex; align-items: center; gap: 6px; }
+.day-detail { background: var(--surface-2); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; font-size: var(--fs-sm); display: flex; flex-direction: column; gap: 6px; }
+.day-detail-row { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
 
-.calendar-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.calendar-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .calendar-head h3 { font-size: var(--fs-md); font-weight: 650; text-transform: capitalize; }
 .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
 .calendar-wd { text-align: center; font-size: 0.6875rem; font-weight: 600; color: var(--ink-3); padding-bottom: 4px; }
-.cal-day { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 2px; min-height: 54px; padding: 6px 0 4px; border-radius: 12px; font-size: var(--fs-sm); font-weight: 600; background: transparent; }
+.cal-day { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 2px; min-height: 54px; padding: 6px 0 4px; border-radius: 12px; font-size: var(--fs-sm); font-weight: 600; background: transparent; transition: background 120ms ease, transform 100ms ease; }
+.cal-day:not([data-past]):hover { background: rgba(37, 99, 235, 0.06); }
+.cal-day:active { transform: scale(0.96); }
+.cal-day:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
 .cal-day[data-past] { color: #b6bfcc; }
 .cal-day[data-today] .cal-num { background: var(--ink); color: #fff; }
 .cal-num { width: 24px; height: 24px; border-radius: 8px; display: grid; place-items: center; }
@@ -303,7 +311,7 @@ textarea.input { padding: 12px 14px; min-height: 76px; resize: vertical; }
 .day-panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
 .day-panel-head h3 { font-size: var(--fs-md); font-weight: 650; }
 .day-totals { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0; }
-.day-totals > div { background: var(--surface-2); border-radius: var(--r-sm); padding: 8px 10px; min-width: 0; }
+.day-totals > div { background: var(--surface-2); border: 1px solid rgba(14, 27, 54, 0.05); border-radius: var(--r-sm); padding: 8px 10px; min-width: 0; }
 .day-totals dt { font-size: var(--fs-xs); color: var(--ink-3); }
 .day-totals dd { margin: 2px 0 0; font-weight: 700; font-size: var(--fs-md); overflow: hidden; text-overflow: ellipsis; }
 .day-list { display: flex; flex-direction: column; margin: 0 -16px; }

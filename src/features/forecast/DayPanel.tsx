@@ -58,11 +58,23 @@ export function DayPanel({ date }: { date: ISODate }) {
       </header>
 
       <dl className="day-totals">
-        <div><dt>Receitas</dt><dd className="in"><Money cents={totals.in} sign smart /></dd></div>
-        <div><dt>Despesas</dt><dd className="out"><Money cents={-totals.out} smart /></dd></div>
+        <div>
+          <dt>Receitas</dt>
+          <dd className="in">
+            <Money cents={totals.in} sign={totals.in > 0} smart />
+          </dd>
+        </div>
+        <div>
+          <dt>Despesas</dt>
+          <dd className="out">
+            <Money cents={totals.out === 0 ? 0 : -totals.out} smart />
+          </dd>
+        </div>
         <div>
           <dt>Saldo previsto</dt>
-          <dd>{day ? <Money className={`tone-${dayStatus}`} cents={day.closing} smart /> : <span className="muted">—</span>}</dd>
+          <dd>
+            {day ? <Money className={`tone-${dayStatus}`} cents={day.closing} smart /> : <span className="muted">—</span>}
+          </dd>
         </div>
       </dl>
       {day && dayStatus && <StatusSentence status={dayStatus} />}

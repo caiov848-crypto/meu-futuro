@@ -6,12 +6,13 @@ import {
 import { applyShardWrites, planPush, type Shard } from './syncMerge';
 
 const CONFIG_KEY = 'meufuturo.autosync';
-const KEY = 'data';
-const API = 'https://kvdb.io';
-const POLL_VISIBLE_MS = 5_000;
-const POLL_HIDDEN_MS = 60_000;
+const POLL_VISIBLE_MS = 25_000;
+const POLL_HIDDEN_MS = 120_000;
+const PROD_ORIGIN = 'https://caiov848-crypto.github.io/meu-futuro/';
+const LINK_PARAM = 'sync';
 
-interface SyncConfig {
+export interface SyncConfig {
+  databaseUrl: string;
   bucketId: string;
   passphrase: string;
 }
@@ -23,13 +24,21 @@ interface SyncBlob {
   shards: Record<string, Shard>;
 }
 
+export function cleanDatabaseUrl(url: string): string {
+  let cleaned = url.trim().replace(/\/+$/, '');
+  if (!cleaned.startsWith('http://') && !cleaned.startsWith('https://')) {
+    cleaned = 'https://' + cleaned;
+  }
+  return cleaned;
+}
+
 /* ---------- Configuração salva neste navegador ---------- */
 
 export function loadConfig(): SyncConfig | null {
   try {
     const raw = localStorage.getItem(CONFIG_KEY);
     const cfg = raw ? (JSON.parse(raw) as SyncConfig) : null;
-    return cfg?.bucketId && cfg.passphrase ? cfg : null;
+    return cfg?.databaseUrl && cfg.bucketId && cfg.passphrase ? cfg : null;
   } catch {
     return null;
   }
@@ -53,7 +62,7 @@ function clearConfig() {
 
 export const isAutoSyncConfigured = () => loadConfig() !== null;
 
-/* ---------- API KVDB ---------- */
+/* ---------- Comunicação Firebase Realtime Database ---------- */
 
 class CloudError extends Error {
   constructor(message: string, readonly status: number) {
@@ -61,33 +70,37 @@ class CloudError extends Error {
   }
 }
 
-async function createBucket(): Promise<string> {
-  const body = new URLSearchParams();
-  body.append('email', 'sync@meufuturo.com');
-  const res = await fetch(API, {
-    method: 'POST',
-    body,
+async function readCloud(cfg: SyncConfig): Promise<string | null> {
+  const url = `${cleanDatabaseUrl(cfg.databaseUrl)}/sync/${encodeURIComponent(cfg.bucketId)}.json`;
+  const res = await fetch(url, { cache: 'no-store' });
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    throw new CloudError(
+      `O Firebase respondeu com erro ${res.status}. Verifique se a URL está correta e as regras do Realtime Database permitem leitura (.read: true).`,
+      res.status,
+    );
+  }
+  const data = await res.json();
+  if (!data) return null;
+  return typeof data.blob === 'string' ? data.blob : null;
+}
+
+async function writeCloud(cfg: SyncConfig, text: string): Promise<void> {
+  const url = `${cleanDatabaseUrl(cfg.databaseUrl)}/sync/${encodeURIComponent(cfg.bucketId)}.json`;
+  const res = await fetch(url, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ blob: text, updatedAt: new Date().toISOString() }),
   });
-  if (!res.ok) throw new CloudError('Não foi possível criar o espaço de sincronização na nuvem.', res.status);
-  return res.text();
+  if (!res.ok) {
+    throw new CloudError(
+      `Não foi possível salvar no Firebase (Erro ${res.status}). Verifique se as regras do Realtime Database permitem escrita (.write: true).`,
+      res.status,
+    );
+  }
 }
 
-async function readCloud(bucketId: string): Promise<string | null> {
-  const res = await fetch(`${API}/${bucketId}/${KEY}`, { cache: 'no-store' });
-  if (res.status === 404) return null; // No data yet
-  if (!res.ok) throw new CloudError(`O servidor respondeu com erro ${res.status}.`, res.status);
-  return res.text();
-}
-
-async function writeCloud(bucketId: string, text: string): Promise<void> {
-  const res = await fetch(`${API}/${bucketId}/${KEY}`, {
-    method: 'POST',
-    body: text,
-  });
-  if (!res.ok) throw new CloudError(`Não foi possível salvar na nuvem (Erro ${res.status}).`, res.status);
-}
-
-/* ---------- Estado ---------- */
+/* ---------- Estado de Sincronização ---------- */
 
 let config: SyncConfig | null = null;
 let remoteShards = new Map<string, Shard>();
@@ -103,7 +116,9 @@ const effectiveReset = () => (localResetAt() > remoteResetAt ? localResetAt() : 
 
 async function decodeBlob(text: string, passphrase: string): Promise<SyncBlob> {
   const blob = JSON.parse(await decryptText(text, passphrase)) as SyncBlob;
-  if (blob.app !== 'meu-futuro' || typeof blob.shards !== 'object') throw new Error('Conteúdo de sincronização inválido.');
+  if (blob.app !== 'meu-futuro' || typeof blob.shards !== 'object') {
+    throw new Error('Conteúdo de sincronização corrompido ou inválido.');
+  }
   return blob;
 }
 
@@ -113,13 +128,12 @@ async function encodeBlob(blob: SyncBlob, passphrase: string): Promise<string> {
   return text;
 }
 
-/** Busca na nuvem; devolve `true` se havia novidade (neste caso simulamos um ETG ou apenas lemos). */
 let lastFetchedText = '';
 async function fetchRemote(cfg: SyncConfig): Promise<boolean> {
-  const text = await readCloud(cfg.bucketId);
-  if (!text) return false;
+  const text = await readCloud(cfg);
+  if (text === null) return false;
   if (text === lastFetchedText) return false;
-  
+
   const blob = await decodeBlob(text, cfg.passphrase);
   lastFetchedText = text;
   salt = envelopeSalt(text);
@@ -141,8 +155,11 @@ async function cycle() {
     if (writes.length || lr > remoteResetAt) {
       setSyncStatus({ state: 'saving' });
       const next = applyShardWrites(remoteShards, writes);
-      const text = await encodeBlob({ app: 'meu-futuro', v: 1, resetAt: reset, shards: Object.fromEntries(next) }, cfg.passphrase);
-      await writeCloud(cfg.bucketId, text);
+      const text = await encodeBlob(
+        { app: 'meu-futuro', v: 1, resetAt: reset, shards: Object.fromEntries(next) },
+        cfg.passphrase,
+      );
+      await writeCloud(cfg, text);
       lastFetchedText = text;
       remoteShards = next;
       remoteResetAt = reset;
@@ -162,7 +179,7 @@ function schedulePoll() {
   pollTimer = setTimeout(() => void serial(cycle).finally(schedulePoll), delay);
 }
 
-function schedulePush(delay = 1200) {
+function schedulePush(delay = 1000) {
   clearTimeout(pushTimer);
   pushTimer = setTimeout(() => void serial(cycle), delay);
 }
@@ -207,30 +224,30 @@ export function syncAutoNow() {
   if (running) void serial(cycle);
 }
 
-const LINK_PARAM = 'sync';
-
-function encodeLinkPayload(bucketId: string, passphrase: string): string {
-  const json = JSON.stringify({ b: bucketId, p: passphrase });
+function encodeLinkPayload(databaseUrl: string, bucketId: string, passphrase: string): string {
+  const json = JSON.stringify({ u: databaseUrl, b: bucketId, p: passphrase });
   const b64 = btoa(unescape(encodeURIComponent(json)));
   return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-function decodeLinkPayload(b64url: string): { bucketId: string; passphrase: string } {
+function decodeLinkPayload(b64url: string): { databaseUrl: string; bucketId: string; passphrase: string } {
   const b64 = b64url.replace(/-/g, '+').replace(/_/g, '/');
   const padded = b64 + '='.repeat((4 - (b64.length % 4)) % 4);
   const json = decodeURIComponent(escape(atob(padded)));
-  const { b, p } = JSON.parse(json) as { b?: string; p?: string };
-  if (!b || !p) throw new Error('Link de sincronização incompleto.');
-  return { bucketId: b, passphrase: p };
+  const { u, b, p } = JSON.parse(json) as { u?: string; b?: string; p?: string };
+  if (!u || !b || !p) throw new Error('Link de sincronização incompleto.');
+  return { databaseUrl: u, bucketId: b, passphrase: p };
 }
 
-export function buildSyncLink(origin = `${window.location.origin}${window.location.pathname}`): string | null {
+export function buildSyncLink(): string | null {
   const cfg = loadConfig();
   if (!cfg) return null;
-  return `${origin}#${LINK_PARAM}=${encodeLinkPayload(cfg.bucketId, cfg.passphrase)}`;
+  const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+  const origin = isLocal ? PROD_ORIGIN : `${window.location.origin}${window.location.pathname}`;
+  return `${origin}#${LINK_PARAM}=${encodeLinkPayload(cfg.databaseUrl, cfg.bucketId, cfg.passphrase)}`;
 }
 
-function readLinkFromLocation(): { bucketId: string; passphrase: string } | null {
+function readLinkFromLocation(): { databaseUrl: string; bucketId: string; passphrase: string } | null {
   const hash = window.location.hash;
   const prefix = `#${LINK_PARAM}=`;
   if (!hash.startsWith(prefix)) return null;
@@ -245,31 +262,39 @@ export async function connectFromLinkIfPresent(): Promise<boolean> {
   const creds = readLinkFromLocation();
   if (!creds) return false;
   history.replaceState(null, '', window.location.pathname + window.location.search);
-  
-  await connectAutoSync(creds.bucketId, creds.passphrase);
+
+  await connectAutoSync(creds.databaseUrl, creds.bucketId, creds.passphrase);
   return true;
 }
 
-export async function connectAutoSync(bucketIdInput?: string, passphraseInput?: string): Promise<void> {
+export async function connectAutoSync(
+  databaseUrlInput: string,
+  bucketIdInput?: string,
+  passphraseInput?: string,
+): Promise<void> {
+  const databaseUrl = cleanDatabaseUrl(databaseUrlInput);
   let bucketId = bucketIdInput;
   let passphrase = passphraseInput;
 
   if (!bucketId || !passphrase) {
-    bucketId = await createBucket();
-    passphrase = crypto.randomUUID() + crypto.randomUUID(); // Chave forte e aleatória
+    bucketId = 'mf_' + crypto.randomUUID().slice(0, 12);
+    passphrase = crypto.randomUUID() + crypto.randomUUID();
   }
 
+  const cfg: SyncConfig = { databaseUrl, bucketId, passphrase };
   salt = undefined;
   lastFetchedText = '';
 
-  const text = await readCloud(bucketId);
-  
+  const text = await readCloud(cfg);
+
   if (!text) {
     const reset = localResetAt();
     const shards = applyShardWrites(new Map(), planPush(await readLocal(), new Map(), reset));
-    const newText = await encodeBlob({ app: 'meu-futuro', v: 1, resetAt: reset, shards: Object.fromEntries(shards) }, passphrase);
-    await writeCloud(bucketId, newText);
-    const cfg = { bucketId, passphrase };
+    const newText = await encodeBlob(
+      { app: 'meu-futuro', v: 1, resetAt: reset, shards: Object.fromEntries(shards) },
+      passphrase,
+    );
+    await writeCloud(cfg, newText);
     remoteShards = shards;
     remoteResetAt = reset;
     saveConfig(cfg);
@@ -277,8 +302,7 @@ export async function connectAutoSync(bucketIdInput?: string, passphraseInput?: 
     return;
   }
 
-  const cfg = { bucketId, passphrase };
-  await fetchRemote(cfg); 
+  await fetchRemote(cfg);
   await replaceLocalWithRemote(remoteShards, remoteResetAt);
   saveConfig(cfg);
   await start(cfg);

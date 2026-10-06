@@ -32,17 +32,48 @@ export function FinanceCalendar(props: {
   return (
     <div>
       <div className="calendar-head">
-        <button className="icon-btn" aria-label="Mês anterior" disabled={!canPrev} style={{ opacity: canPrev ? 1 : 0.3 }} onClick={() => props.onMonth(addMonths(props.month, -1, 1))}>
+        <button
+          className="icon-btn"
+          aria-label="Mês anterior"
+          disabled={!canPrev}
+          style={{ opacity: canPrev ? 1 : 0.25 }}
+          onClick={() => props.onMonth(addMonths(props.month, -1, 1))}
+        >
           <Icon name="left" size={18} />
         </button>
-        <h3>{monthName(props.month)} {y}</h3>
-        <button className="icon-btn" aria-label="Próximo mês" disabled={!canNext} style={{ opacity: canNext ? 1 : 0.3 }} onClick={() => props.onMonth(addMonths(props.month, 1, 1))}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <h3>
+            {monthName(props.month)} {y}
+          </h3>
+          {props.month !== startOfMonth(today) && (
+            <button
+              className="chip chip-sm"
+              style={{ padding: '2px 8px', minHeight: 24, fontSize: '0.6875rem' }}
+              onClick={() => props.onMonth(startOfMonth(today))}
+            >
+              Mês atual
+            </button>
+          )}
+        </div>
+        <button
+          className="icon-btn"
+          aria-label="Próximo mês"
+          disabled={!canNext}
+          style={{ opacity: canNext ? 1 : 0.25 }}
+          onClick={() => props.onMonth(addMonths(props.month, 1, 1))}
+        >
           <Icon name="right" size={18} />
         </button>
       </div>
       <div className="calendar-grid">
-        {WD.map((d, i) => <div key={i} className="calendar-wd">{d}</div>)}
-        {Array.from({ length: offset }, (_, i) => <div key={`e${i}`} />)}
+        {WD.map((d, i) => (
+          <div key={i} className="calendar-wd">
+            {d}
+          </div>
+        ))}
+        {Array.from({ length: offset }, (_, i) => (
+          <div key={`e${i}`} />
+        ))}
         {Array.from({ length: total }, (_, i) => {
           const date = toISO(y, m, i + 1);
           if (date < today) {
@@ -55,24 +86,25 @@ export function FinanceCalendar(props: {
                 aria-label={`${i + 1}: dia passado`}
                 onClick={() => props.onSelect(date)}
               >
-                {realizedDays.has(date) && <span className="cal-ev" />}
+                {realizedDays.has(date) && <span className="cal-ev" title="Teve lançamentos realizados" />}
                 <span className="cal-num">{i + 1}</span>
               </button>
             );
           }
           const day = getDay(model, date);
           const status = statusOf(model, day.closing);
+          const isToday = date === today;
           return (
             <button
               key={date}
               className="cal-day"
-              data-today={date === today || undefined}
+              data-today={isToday || undefined}
               data-status={status}
               aria-pressed={date === props.selected}
-              aria-label={`${i + 1}: saldo previsto ${formatCompact(day.closing)} reais`}
+              aria-label={`${isToday ? 'Hoje, ' : ''}${i + 1}: saldo previsto ${formatCompact(day.closing)} reais`}
               onClick={() => props.onSelect(date)}
             >
-              {day.events.length > 0 && <span className="cal-ev" />}
+              {day.events.length > 0 && <span className="cal-ev" title="Movimentos previstos" />}
               <span className="cal-num">{i + 1}</span>
               <span className="cal-dot" data-status={status} />
               <span className="cal-bal">{formatCompact(day.closing)}</span>
@@ -80,10 +112,16 @@ export function FinanceCalendar(props: {
           );
         })}
       </div>
-      <div className="chart-legend" style={{ marginTop: 10 }}>
-        <span className="status" data-status="comfortable">confortável</span>
-        <span className="status" data-status="attention">atenção</span>
-        <span className="status" data-status="risk">abaixo da segurança</span>
+      <div className="calendar-legend">
+        <span className="legend-item">
+          <span className="cal-dot" data-status="comfortable" /> Confortável
+        </span>
+        <span className="legend-item">
+          <span className="cal-dot" data-status="attention" /> Atenção
+        </span>
+        <span className="legend-item">
+          <span className="cal-dot" data-status="risk" /> Risco (abaixo da segurança)
+        </span>
       </div>
     </div>
   );
